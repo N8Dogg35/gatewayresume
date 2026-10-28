@@ -2,6 +2,8 @@ import {
   amtCertCatalog,
   amtSkillCatalog,
   canonicalGroupLabel,
+  emtSkillCatalog,
+  emtSummarySkeleton,
   experienceTypes,
   matchCatalogSkill,
   steps,
@@ -12,8 +14,10 @@ import {
   blankState,
   clearAmtPrefill,
   clearAmtSkills,
+  clearEmtPrefill,
   loadState,
   prefillAmt,
+  prefillEmt,
   saveState,
 } from "./state.js";
 
@@ -143,6 +147,7 @@ function privacy() {
 
 function renderStart() {
   const amtSelected = state.track === "amt" ? " is-selected" : "";
+  const emtSelected = state.track === "emt" ? " is-selected" : "";
   const generalSelected = state.track === "general" ? " is-selected" : "";
   return `<div class="shell">
     <h1>AI Resume Builder - Create Your Prompt</h1>
@@ -152,6 +157,11 @@ function renderStart() {
         <span class="eyebrow">Gateway Technical College · 10-664-2</span>
         <span class="track-title">Advanced Manufacturing Technology</span>
         <span class="track-copy">Courses, program outcomes, and embedded certifications are built in, along with the ATS resume standard.</span>
+      </button>
+      <button type="button" class="track-card${emtSelected}" data-track="emt">
+        <span class="eyebrow">Gateway Technical College · 31-620-3</span>
+        <span class="track-title">Electromechanical Maintenance Technician</span>
+        <span class="track-copy">For students in this technical diploma. Coursework from the program is built in, and you check only the skills you have practiced.</span>
       </button>
       <button type="button" class="track-card${generalSelected}" data-track="general">
         <span class="eyebrow">Any school</span>
@@ -164,8 +174,12 @@ function renderStart() {
 }
 
 function header() {
-  const title =
-    state.track === "amt" ? "Advanced Manufacturing Technology" : "Any program";
+  const titles = {
+    amt: "Advanced Manufacturing Technology",
+    emt: "Electromechanical Maintenance Technician",
+    general: "Any program",
+  };
+  const title = titles[state.track] || "Any program";
   return `<header class="top">
     <div>
       <p class="eyebrow">Resume brief</p>
@@ -212,10 +226,12 @@ function renderWizard() {
     state.step === "education"
       ? state.track === "amt"
         ? "Gateway, Sturtevant, and your program are filled in. The Electromechanical Maintenance Technician diploma is filled in below the associate degree. In the notes, name the technical labs and coursework you want on the resume. General education stays off."
-        : "Enter the school and program you want on the resume. Use the notes for coursework or labs. Add an earlier credential if you have one."
-      : state.step === "summary" && state.track !== "amt"
+        : state.track === "emt"
+          ? "Gateway, Sturtevant, and the Electromechanical Maintenance Technician diploma are filled in. This path treats you as a current student in that diploma. Add an earlier credential only if you finished a different program. In the notes, name the labs you want on the resume. General education stays off."
+          : "Enter the school and program you want on the resume. Use the notes for coursework or labs. Add an earlier credential if you have one."
+      : state.step === "summary" && state.track === "general"
         ? "This is the short paragraph under your name. Give the facts you want in it. The assistant writes the sentences, and the whole resume stays on one page."
-        : state.step === "skills" && state.track !== "amt"
+        : state.step === "skills" && state.track === "general"
           ? "Group the skills you could talk about in an interview. Leave a group out if it does not apply."
           : state.step === "certifications" && state.track !== "amt"
             ? "List only certifications you have earned. Add an issuer when you have one, and the assistant will group them on one line."
@@ -303,6 +319,7 @@ function panelJob() {
 
 function panelSummary() {
   if (state.track === "amt") return panelAmtSummary();
+  if (state.track === "emt") return panelEmtSummary();
   return panelGeneralSummary();
 }
 
@@ -384,18 +401,78 @@ function panelAmtSummary() {
     })}`;
 }
 
+function panelEmtSummary() {
+  const summary = state.summary;
+  return `<div class="pattern">
+      <h3>How this paragraph is built</h3>
+      <ol>
+        <li>Name the technical role, then write "with hands-on training in," then three to five specific tools.</li>
+        <li>The credential sentence is already set: currently pursuing a Technical Diploma in Electromechanical Maintenance Technician at Gateway Technical College. Do not say the diploma is finished, and do not add a GPA.</li>
+        <li>If you already have a role, start that sentence with "Incoming," and give the employer and the start. Leave it out if you are still applying.</li>
+        <li>Give earlier work one sentence at the end: how long, the skill you are bringing, and "applied now to" this field. Leave it out if the summary should stay with your training.</li>
+      </ol>
+      <p class="hint">Shape, with your facts in the brackets:</p>
+      <p class="skeleton">${escapeHtml(emtSummarySkeleton)}</p>
+    </div>
+    <p class="hint pattern-note">Replace every bracket with your own facts, or skip that sentence.</p>
+    ${field({
+      label: "What technical role should the first line name?",
+      path: "summary.focus",
+      value: summary.focus,
+      placeholder: "Maintenance technician",
+      hint: "A job noun, such as maintenance technician.",
+    })}
+    ${field({
+      label: "Which tools should that sentence name?",
+      path: "summary.tools",
+      value: summary.tools,
+      multiline: true,
+      placeholder: "Three to five tools you have actually used",
+      hint: "Name the specific system you have practiced. Leave out anything you could not explain in an interview.",
+    })}
+    ${field({
+      label: "Do you already have a next role?",
+      path: "summary.nextRole",
+      value: summary.nextRole,
+      placeholder: "Employer, title, and start date",
+      hint: "Optional. Leave this blank if you are still applying.",
+    })}
+    ${field({
+      label: "What earlier work is worth one sentence?",
+      path: "summary.prior",
+      value: summary.prior,
+      multiline: true,
+      placeholder: "Years, the skill it gave you, and the field you use it in now",
+      hint: "Optional. Leave this blank to keep the summary with your training.",
+    })}
+    ${field({
+      label: "Write the summary in your own words",
+      path: "summary.draft",
+      value: summary.draft,
+      multiline: true,
+      rows: 7,
+      placeholder: "A rough paragraph is enough. The assistant will tighten it.",
+      hint: "The assistant adds the credential sentence for you. It will not say the diploma is finished, and it will not add a GPA.",
+    })}`;
+}
+
 function panelEducation() {
   const ed = state.education;
   const earlier = ed.earlier;
   return `${field({ label: "School", path: "education.school", value: ed.school, autocomplete: "organization" })}
-    ${field({ label: "Credential", path: "education.credential", value: ed.credential, placeholder: "Associate of Applied Science" })}
+    ${field({
+      label: "Credential",
+      path: "education.credential",
+      value: ed.credential,
+      placeholder: state.track === "emt" ? "Technical Diploma" : "Associate of Applied Science",
+    })}
     ${field({ label: "Program", path: "education.program", value: ed.program })}
     <div class="grid-2">
       ${field({
         label: "Campus city",
         path: "education.city",
         value: ed.city,
-        placeholder: state.track === "amt" ? "Sturtevant" : "",
+        placeholder: state.track === "amt" || state.track === "emt" ? "Sturtevant" : "",
       })}
       ${field({ label: "State", path: "education.state", value: ed.state, placeholder: "WI" })}
     </div>
@@ -416,7 +493,9 @@ function panelEducation() {
     <p class="hint">${
       state.track === "amt"
         ? "The Electromechanical Maintenance Technician diploma is filled in. Add the date you finished it if you want that on the resume."
-        : "Optional. A diploma, degree, or certificate that should appear under your current program."
+        : state.track === "emt"
+          ? "Optional. Leave this blank unless you finished a different program before this diploma."
+          : "Optional. A diploma, degree, or certificate that should appear under your current program."
     }</p>
     ${field({ label: "School", path: "education.earlier.school", value: earlier.school })}
     ${field({ label: "Credential", path: "education.earlier.credential", value: earlier.credential, placeholder: "Technical diploma" })}
@@ -429,7 +508,7 @@ function panelEducation() {
       label: "Date",
       path: "education.earlier.gradDate",
       value: earlier.gradDate,
-      placeholder: "Completed Spring 2026",
+      placeholder: state.track === "emt" ? "Month and year" : "Completed Spring 2026",
     })}
     ${field({
       label: "Coursework or labs for this credential",
@@ -502,8 +581,15 @@ function listField(label, list, entry, key, placeholder = "", multiline = false,
 }
 
 function panelSkills() {
-  if (state.track === "amt") return panelAmtSkills();
+  if (state.track === "amt") return panelCatalogSkills(amtSkillCatalog);
+  if (state.track === "emt") return panelCatalogSkills(emtSkillCatalog);
   return panelFreeSkills();
+}
+
+function activeSkillCatalog() {
+  if (state.track === "emt") return emtSkillCatalog;
+  if (state.track === "amt") return amtSkillCatalog;
+  return null;
 }
 
 function panelFreeSkills() {
@@ -568,8 +654,8 @@ function catalogSkillCard(group) {
   </article>`;
 }
 
-function extraSkillGroups() {
-  const known = new Set(amtSkillCatalog.map((group) => group.label.toLowerCase()));
+function extraSkillGroups(catalog) {
+  const known = new Set(catalog.map((group) => group.label.toLowerCase()));
   const labels = [];
   for (const skill of state.customSkills || []) {
     const label = clean(skill.group) || "Other";
@@ -579,8 +665,8 @@ function extraSkillGroups() {
   return labels;
 }
 
-function panelAmtSkills() {
-  const extras = extraSkillGroups()
+function panelCatalogSkills(catalog) {
+  const extras = extraSkillGroups(catalog)
     .map(
       (label) => `<article class="entry-card">
         <h3>${escapeHtml(label)}</h3>
@@ -588,7 +674,7 @@ function panelAmtSkills() {
       </article>`
     )
     .join("");
-  return `${amtSkillCatalog.map((group) => catalogSkillCard(group)).join("")}
+  return `${catalog.map((group) => catalogSkillCard(group)).join("")}
     ${extras}
     <h3>Add a skill in a different group</h3>
     <p class="hint">Use this when none of the groups above fit.</p>
@@ -636,7 +722,12 @@ function panelCertifications() {
       </div>`
     )
     .join("");
-  const extraHeading = state.track === "amt" ? "Add a certification that is not listed" : "Other certifications";
+  const extraHeading =
+    state.track === "amt"
+      ? "Add a certification that is not listed"
+      : state.track === "emt"
+        ? "Add a certification you have earned"
+        : "Other certifications";
   return `${embedded}
     <h3>${extraHeading}</h3>
     ${extras}
@@ -679,8 +770,8 @@ function panelReview() {
       `<p>${escapeHtml(record.job.title || "Title not set")}${record.job.company ? ` · ${escapeHtml(record.job.company)}` : ""}</p>
        <p class="excerpt">${escapeHtml(excerpt)}</p>`
     )}
-    ${summaryBlock(state.track === "amt" ? "Technical summary" : "Summary", "summary", summaryReview(record))}
-    ${summaryBlock(state.track === "amt" ? "Technical skills" : "Skills", "skills", skillBody)}
+    ${summaryBlock(state.track === "general" ? "Summary" : "Technical summary", "summary", summaryReview(record))}
+    ${summaryBlock(state.track === "general" ? "Skills" : "Technical skills", "skills", skillBody)}
     ${summaryBlock(
       "Education",
       "education",
@@ -696,13 +787,15 @@ function panelReview() {
     <p class="hint">${
       state.track === "amt"
         ? "The brief asks for one page, with a technical summary, grouped skills, education, experience, and certifications. General education stays off. Lab details come only from your notes."
-        : "The brief asks for one page: summary, skills, education, experience, and certifications, using the facts on this page."
+        : state.track === "emt"
+          ? "The brief asks for one page, with a technical summary, grouped skills, education, experience, and certifications. It keeps you in the Electromechanical Maintenance Technician diploma. General education stays off. Lab details come only from your notes."
+          : "The brief asks for one page: summary, skills, education, experience, and certifications, using the facts on this page."
     }</p>`;
 }
 
 function summaryReview(record) {
   const summary = record.summary || {};
-  if (record.track !== "amt") {
+  if (record.track !== "amt" && record.track !== "emt") {
     const line = [summary.focus, summary.tools, summary.mustInclude].filter((item) => clean(item)).join(" · ");
     return `<p>${escapeHtml(line || "The assistant will write this from your other sections.")}</p>`;
   }
@@ -765,9 +858,14 @@ function clean(value) {
 }
 
 function chooseTrack(track) {
-  if (track === "amt") prefillAmt(state);
+  if (track === "amt") {
+    clearEmtPrefill(state);
+    prefillAmt(state);
+  }
+  if (track === "emt") prefillEmt(state);
   if (track === "general") {
     clearAmtPrefill(state);
+    clearEmtPrefill(state);
     clearAmtSkills(state);
   }
   state.track = track;
@@ -1004,8 +1102,9 @@ function draftValue(key) {
 function addCustomSkillName(groupLabel, name) {
   const skillName = clean(name);
   if (!skillName) return false;
-  const label = canonicalGroupLabel(groupLabel);
-  const match = matchCatalogSkill(label, skillName);
+  const catalog = activeSkillCatalog() || amtSkillCatalog;
+  const label = canonicalGroupLabel(groupLabel, catalog);
+  const match = matchCatalogSkill(label, skillName, catalog);
   if (!state.selectedSkills) state.selectedSkills = {};
   if (!Array.isArray(state.customSkills)) state.customSkills = [];
   if (match) {
@@ -1014,7 +1113,7 @@ function addCustomSkillName(groupLabel, name) {
   }
   const exists = state.customSkills.some(
     (skill) =>
-      canonicalGroupLabel(skill.group).toLowerCase() === label.toLowerCase() &&
+      canonicalGroupLabel(skill.group, catalog).toLowerCase() === label.toLowerCase() &&
       clean(skill.name).toLowerCase() === skillName.toLowerCase()
   );
   if (exists) return true;
@@ -1033,9 +1132,10 @@ function commitDraftValue(groupLabel, raw) {
 }
 
 function commitPendingSkills() {
-  if (state.track !== "amt") return;
+  const catalog = activeSkillCatalog();
+  if (!catalog) return;
   if (!state.skillDrafts) state.skillDrafts = {};
-  for (const group of amtSkillCatalog) {
+  for (const group of catalog) {
     if (commitDraftValue(group.label, draftValue(group.id))) state.skillDrafts[group.id] = "";
   }
   if (commitDraftValue(draftValue("extraGroup") || "Other", draftValue("extraName"))) {
@@ -1045,7 +1145,8 @@ function commitPendingSkills() {
 }
 
 function addCatalogSkill(groupId) {
-  const group = amtSkillCatalog.find((item) => item.id === groupId);
+  const catalog = activeSkillCatalog();
+  const group = catalog?.find((item) => item.id === groupId);
   if (!group) return;
   if (!commitDraftValue(group.label, draftValue(group.id))) return;
   if (!state.skillDrafts) state.skillDrafts = {};

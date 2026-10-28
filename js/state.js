@@ -113,7 +113,7 @@ export function normalize(raw) {
   };
   state.pullLinkedIn = Boolean(state.pullLinkedIn);
   state.linkedInPaste = state.linkedInPaste || "";
-  if (state.track !== "amt" && state.track !== "general") {
+  if (state.track !== "amt" && state.track !== "emt" && state.track !== "general") {
     state.track = null;
     state.step = "start";
   }
@@ -121,6 +121,7 @@ export function normalize(raw) {
   state.showJobError = Boolean(state.showJobError);
   absorbLegacySkillText(state);
   if (state.track === "amt") applyAmtEducationDefaults(state);
+  if (state.track === "emt") applyEmtEducationDefaults(state);
   return state;
 }
 
@@ -271,5 +272,52 @@ export function prefillAmt(state) {
 
 export function clearAmtPrefill(state) {
   if (!educationMatchesPrefill(state)) return;
+  state.education = blankEducation();
+}
+
+export function educationMatchesEmt(state) {
+  const ed = state.education;
+  return (
+    ed.school === emtCredential.school &&
+    ed.credential === emtCredential.credential &&
+    ed.program === emtCredential.program &&
+    (text(ed.city) === "" || text(ed.city) === emtCredential.city) &&
+    (text(ed.state) === "" || text(ed.state) === emtCredential.state) &&
+    !text(ed.gradDate) &&
+    !text(ed.notes) &&
+    earlierEmpty(ed)
+  );
+}
+
+export function applyEmtEducationDefaults(state) {
+  const ed = state.education;
+  if (!ed.earlier) ed.earlier = blankEarlier();
+  const blank = !text(ed.school) && !text(ed.credential) && !text(ed.program) && earlierEmpty(ed);
+  const replace = blank || educationMatchesEmt(state) || educationMatchesPrefill(state);
+  if (!replace) {
+    if (
+      ed.school === emtCredential.school &&
+      ed.credential === emtCredential.credential &&
+      ed.program === emtCredential.program
+    ) {
+      if (!text(ed.city)) ed.city = emtCredential.city;
+      if (!text(ed.state)) ed.state = emtCredential.state;
+    }
+    return;
+  }
+  ed.school = emtCredential.school;
+  ed.credential = emtCredential.credential;
+  ed.program = emtCredential.program;
+  ed.city = emtCredential.city;
+  ed.state = emtCredential.state;
+  ed.earlier = blankEarlier();
+}
+
+export function prefillEmt(state) {
+  applyEmtEducationDefaults(state);
+}
+
+export function clearEmtPrefill(state) {
+  if (!educationMatchesEmt(state)) return;
   state.education = blankEducation();
 }

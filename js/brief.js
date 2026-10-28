@@ -3,7 +3,13 @@ import {
   amtPositioning,
   amtProgram,
   assembleAmtSkillGroups,
+  assembleEmtSkillGroups,
   atsRules,
+  emtPositioning,
+  emtProgram,
+  emtSummaryEditRules,
+  emtSummarySkeleton,
+  emtTechnicalCourses,
   labelFor,
   experienceTypes,
   summaryEditRules,
@@ -51,9 +57,11 @@ export function collectRecord(state) {
   const skillGroups =
     state.track === "amt"
       ? assembleAmtSkillGroups(state)
-      : (state.skillGroups || [])
-          .map((group) => ({ label: clean(group.label), skills: clean(group.skills) }))
-          .filter((group) => group.skills);
+      : state.track === "emt"
+        ? assembleEmtSkillGroups(state)
+        : (state.skillGroups || [])
+            .map((group) => ({ label: clean(group.label), skills: clean(group.skills) }))
+            .filter((group) => group.skills);
 
   const certs = collectCerts(state);
 
@@ -65,7 +73,8 @@ export function collectRecord(state) {
     summary: state.summary || { focus: "", tools: "", mustInclude: "" },
     education: state.education,
     earlier: credentialFilled(earlier) ? earlier : null,
-    technicalCourses: state.track === "amt" ? technicalCourses() : [],
+    technicalCourses:
+      state.track === "amt" ? technicalCourses() : state.track === "emt" ? emtTechnicalCourses() : [],
     experience,
     pullLinkedIn: Boolean(state.pullLinkedIn),
     linkedInPaste: clean(state.linkedInPaste),
@@ -140,6 +149,29 @@ Student's draft. Edit this. Do not drop a fact it already states:
 ${quote(summary.draft)}`;
 }
 
+function emtSummaryNotes(summary) {
+  return `### Technical summary
+Edit the student's draft into the technical summary on the resume. Follow every rule below. The student's draft and the answers are the facts. The skeleton is only the shape.
+
+${emtSummaryEditRules.map((rule) => `- ${rule}`).join("\n")}
+
+Skeleton:
+${quote(emtSummarySkeleton)}
+
+The credential sentence is already known. The student is currently in this diploma. Use it in the summary and do not ask the student for it. Do not add a GPA. Do not add another program.
+Currently pursuing a Technical Diploma in Electromechanical Maintenance Technician at Gateway Technical College.
+
+Answers for the rest of that paragraph. "not provided" means the student left the line blank. Do not fill a blank from general knowledge.
+${line("Technical role to open with", summary.focus)}
+${line("Tools or systems the first sentence must name", summary.tools)}
+${line("Role already secured", summary.nextRole)}
+${line("Earlier work worth one sentence", summary.prior)}
+${line("A fact that must appear", summary.mustInclude)}
+
+Student's draft. Edit this. Do not drop a fact it already states:
+${quote(summary.draft)}`;
+}
+
 function htmlSkeleton() {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -198,13 +230,13 @@ function htmlSkeleton() {
     <div class="contact-line"></div>
   </header>
 
-  <!-- Advanced Manufacturing track: heading is Technical Summary. General track: Summary. Two or three lines. Omit on the general track only when it would be filler. -->
+  <!-- Technical tracks: heading is Technical Summary. General track: Summary. Two or three lines. Omit on the general track only when it would be filler. -->
   <section>
     <h2>Technical Summary</h2>
     <p></p>
   </section>
 
-  <!-- Omit when the student selected or typed no skills. One paragraph per group: a bold label, then the tools. No columns and no bars. Advanced Manufacturing heading: Technical Skills. -->
+  <!-- Omit when the student selected or typed no skills. One paragraph per group: a bold label, then the tools. No columns and no bars. Technical-track heading: Technical Skills. -->
   <section>
     <h2>Technical Skills</h2>
     <p><strong></strong> </p>
@@ -265,9 +297,20 @@ function experienceBlock(entry) {
   ].join("\n");
 }
 
+function trackLine(track) {
+  if (track === "amt") {
+    return `${amtProgram.programName}, ${amtProgram.school}. Do not print a catalog number on the resume.`;
+  }
+  if (track === "emt") {
+    return `${emtProgram.programName}, ${emtProgram.school}. The student is currently pursuing this technical diploma. Do not print a catalog number on the resume. Do not add another program.`;
+  }
+  return "Any program. Follow the applicant tracking rules.";
+}
+
 export function buildBrief(state) {
   const record = collectRecord(state);
   const amt = record.track === "amt";
+  const emt = record.track === "emt";
   const parts = [];
 
   parts.push(`# Resume brief
@@ -276,7 +319,7 @@ You are a career-services resume writer. Draft a resume for one job from the stu
 
 ## Standards for this resume
 
-Track: ${amt ? `${amtProgram.programName}, ${amtProgram.school}. Do not print a catalog number on the resume.` : "Any program. Follow the applicant tracking rules."}
+Track: ${trackLine(record.track)}
 
 ### Applicant tracking rules
 ${atsRules.map((rule) => `- ${rule}`).join("\n")}`);
@@ -295,6 +338,22 @@ ${amtProgram.outcomes.map((outcome) => `- ${outcome}`).join("\n")}
 
 Technical courses in the program. General education is already removed from this list. Use a few titles that match the job on one coursework line. Do not print this whole list.
 ${technicalCourses().map((course) => `- ${course.title}`).join("\n")}`);
+  }
+
+  if (emt) {
+    parts.push(`### How to position this student
+${emtPositioning.map((rule) => `- ${rule}`).join("\n")}
+
+### Program context
+This explains the technical diploma. It is not a list of personal accomplishments. Do not copy an outcome onto the resume unless the student's notes show that work. When you do, describe it as training. Do not add another program.
+
+${emtProgram.description}
+
+Program learning outcomes:
+${emtProgram.outcomes.map((outcome) => `- ${outcome}`).join("\n")}
+
+Technical courses in the diploma. The student-success course is already removed from this list. Use a few titles that match the job on one coursework line. Do not print this whole list.
+${emtTechnicalCourses().map((course) => `- ${course.title}`).join("\n")}`);
   }
 
   const contact = record.contact;
@@ -353,7 +412,11 @@ ${quote(record.linkedInPaste)}`;
       ];
 
   const summary = record.summary || {};
-  const summaryNotes = amt ? amtSummaryNotes(summary) : generalSummaryNotes(summary);
+  const summaryNotes = amt
+    ? amtSummaryNotes(summary)
+    : emt
+      ? emtSummaryNotes(summary)
+      : generalSummaryNotes(summary);
 
   parts.push(`## Student record
 
@@ -381,7 +444,7 @@ ${line("City and state", place)}
 ${line("Graduation", education.gradDate)}
 Coursework and lab notes (this is the only source for lab bullets):
 ${quote(education.notes)}
-${earlierBlock}
+${emt ? "\nProgram status: the student is currently pursuing this technical diploma. Print a graduation date only when one is written above. Do not describe the diploma as completed, and do not add another program.\n" : ""}${earlierBlock}
 
 ### Experience
 ${experienceLines.join("\n\n")}
@@ -409,8 +472,13 @@ Plain text the student can paste into Word.
 - Name on its own line.
 - Next line: city, state, phone, email, and LinkedIn if provided, separated by vertical bars.
 - Section labels on their own lines, in this order: summary, skills, education, experience, certifications. Drop a section the student record says to omit. Do not add a Projects section.
-- On the Advanced Manufacturing track the headings are TECHNICAL SUMMARY, TECHNICAL SKILLS, EDUCATION, EXPERIENCE, and CERTIFICATIONS. Always include the technical summary. Edit it with the technical-summary rules in the student record. Do not replace it with an objective.
-- On the general track, use SUMMARY and SKILLS. Include a summary only when it states a specific credential, skill, or goal from the record. Do not write a vague objective.
+- ${
+    emt
+      ? "On this track the headings are TECHNICAL SUMMARY, TECHNICAL SKILLS, EDUCATION, EXPERIENCE, and CERTIFICATIONS. Always include the technical summary. Edit it with the technical-summary rules in the student record. Do not replace it with an objective. The student is currently pursuing the technical diploma. Do not describe it as completed, and do not add another program."
+      : amt
+        ? "On this track the headings are TECHNICAL SUMMARY, TECHNICAL SKILLS, EDUCATION, EXPERIENCE, and CERTIFICATIONS. Always include the technical summary. Edit it with the technical-summary rules in the student record. Do not replace it with an objective."
+        : "On this track, use SUMMARY and SKILLS. Include a summary only when it states a specific credential, skill, or goal from the record. Do not write a vague objective."
+  }
 - Each school and job is a heading line with the date at the end of that same line, then a line for the credential or role, then left-aligned bullets. Coursework is one bullet. Lab notes become further bullets under that school. Do not use a table, text box, header, footer, or column.
 - Certifications are one line per issuer, with the names separated by a middot.
 - Assume Calibri. Say the point size you used in the note under the drafts.
